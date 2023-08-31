@@ -13,17 +13,19 @@ int main(int argc, char* argv[])
     int flag = 0;
     for (int i = 3; i <= 35; ++i) {
         if (i % 2 != 0 && flag == 0) {
-            flag = 1;
-            int pid = fork(); 
+            flag    = 1;
+            int pid = fork();
             if (pid == 0) {
                 close(p[cnt][1]);
                 recur_pipe(i, cnt + 1);
-            } else {
+            }
+            else {
                 close(p[cnt][0]);
                 printf("prime %d\n", i);
                 write(p[cnt][1], &i, sizeof(int));
             }
-        } else if (i % 2 != 0) {
+        }
+        else if (i % 2 != 0) {
             write(p[cnt][1], &i, sizeof(int));
         }
     }
@@ -37,19 +39,21 @@ void recur_pipe(int base, int cnt)
     int tmp;
     int flag = 0;
     pipe(p[cnt]);
-    while((read(p[cnt - 1][0], &tmp, sizeof(int)) > 0)) {
+    while ((read(p[cnt - 1][0], &tmp, sizeof(int)) > 0)) {
         if (tmp % base != 0 && flag == 0) {
-            flag = 1;
+            flag    = 1;
             int pid = fork();
             if (pid == 0) {
                 close(p[cnt][1]);
                 recur_pipe(tmp, cnt + 1);
-            } else {
+            }
+            else {
                 close(p[cnt][0]);
                 printf("prime %d\n", tmp);
                 write(p[cnt][1], &tmp, sizeof(int));
             }
-        } else if (tmp % base != 0) {
+        }
+        else if (tmp % base != 0) {
             write(p[cnt][1], &tmp, sizeof(int));
         }
     }
