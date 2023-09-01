@@ -99,6 +99,8 @@ sys_uptime(void)
 uint64
 sys_trace(void)
 {
-  argint(0, &myproc()->trace_mask);
+  if (argint(0, &myproc()->trace_mask) < 0) {
+    return -1;
+  }
   return 0;
 }

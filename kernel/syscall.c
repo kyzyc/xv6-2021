@@ -131,29 +131,29 @@ static uint64 (*syscalls[])(void) = {
 [SYS_trace]   sys_trace,
 };
 
-char* sys_call_name_index[] = {
-  "fork",
-  "exit",
-  "wait",
-  "pipe",
-  "read",
-  "kill",
-  "exec",
-  "fstat",
-  "chdir",
-  "dup",
-  "getpid",
-  "sbrk",
-  "sleep",
-  "uptime",
-  "open",
-  "write",
-  "mknod",
-  "unlink",
-  "link",
-  "mkdir",
-  "close",
-  "trace",
+const static char* sys_call_name_index[] = {
+  [SYS_fork]    "fork",
+  [SYS_exit]    "exit",
+  [SYS_wait]    "wait",
+  [SYS_pipe]    "pipe",
+  [SYS_read]    "read",
+  [SYS_kill]    "kill",
+  [SYS_exec]    "exec",
+  [SYS_fstat]   "fstat",
+  [SYS_chdir]   "chdir",
+  [SYS_dup]     "dup",
+  [SYS_getpid]  "getpid",
+  [SYS_sbrk]    "sbrk",
+  [SYS_sleep]   "sleep",
+  [SYS_uptime]  "uptime",
+  [SYS_open]    "open",
+  [SYS_write]   "write",
+  [SYS_mknod]   "mknod",
+  [SYS_unlink]  "unlink",
+  [SYS_link]    "link",
+  [SYS_mkdir]   "mkdir",
+  [SYS_close]   "close",
+  [SYS_trace]   "trace",
 };
 
 void
@@ -166,7 +166,7 @@ syscall(void)
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     p->trapframe->a0 = syscalls[num]();
     if ((p->trace_mask & (1 << num)) != 0) {
-      printf("%d: syscall %s -> %d\n", p->pid, sys_call_name_index[num - 1], p->trapframe->a0);
+      printf("%d: syscall %s -> %d\n", p->pid, sys_call_name_index[num], p->trapframe->a0);
     }
   } else {
     printf("%d %s: unknown sys call %d\n",
