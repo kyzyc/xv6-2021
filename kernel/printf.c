@@ -7,6 +7,7 @@
 #include "types.h"
 #include "param.h"
 #include "spinlock.h"
+#include "sysinfo.h"
 #include "sleeplock.h"
 #include "fs.h"
 #include "file.h"

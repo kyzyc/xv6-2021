@@ -99,6 +99,9 @@ struct proc {
   // trace mask code
   int trace_mask;
 
+  // sysinfo infomation
+  struct sysinfo sinfo;
+
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)

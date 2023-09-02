@@ -9,6 +9,7 @@
 #include "fs.h"
 #include "spinlock.h"
 #include "sleeplock.h"
+#include "sysinfo.h"
 #include "file.h"
 #include "stat.h"
 #include "proc.h"
