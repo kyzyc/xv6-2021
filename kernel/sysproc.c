@@ -5,8 +5,8 @@
 #include "param.h"
 #include "memlayout.h"
 #include "spinlock.h"
-#include "sysinfo.h"
 #include "proc.h"
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -116,13 +116,12 @@ sys_sysinfo(void)
   }
 
   struct proc* p = myproc();
+  struct sysinfo info;
 
-  acquire(&p->lock);
-  p->sinfo.nproc = calcprocnum();
-  p->sinfo.freemem = calcfreemem();
-  release(&p->lock);
+  info.nproc = calcprocnum();
+  info.freemem = calcfreemem();
 
-  if (copyout(p->pagetable, sinfo, (char *)&p->sinfo, sizeof(p->sinfo)) < 0) {
+  if (copyout(p->pagetable, sinfo, (char *)&info, sizeof(info)) < 0) {
     return -1;
   }
 

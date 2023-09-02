@@ -3,7 +3,6 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
-#include "sysinfo.h"
 #include "proc.h"
 #include "defs.h"
 
@@ -99,18 +98,17 @@ allocpid() {
 }
 
 // calculate the number of UNUSED processes
-int
+uint64
 calcprocnum() {
   struct proc* p;
 
-  int cnt = 0;
+  uint64 cnt = 0;
 
   for(p = proc; p < &proc[NPROC]; p++) {
     if (p->state != UNUSED) {
       cnt++;
     }
   }
-  printf("%d\n", cnt);
 
   return cnt;
 }

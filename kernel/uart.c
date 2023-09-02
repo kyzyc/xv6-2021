@@ -7,7 +7,6 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
-#include "sysinfo.h"
 #include "proc.h"
 #include "defs.h"
 

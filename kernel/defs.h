@@ -64,7 +64,7 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
-int             calcfreemem(void);
+uint64          calcfreemem(void);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -106,7 +106,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
-int             calcprocnum(void);
+uint64          calcprocnum(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

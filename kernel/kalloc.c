@@ -81,10 +81,10 @@ kalloc(void)
   return (void*)r;
 }
 
-int
+uint64
 calcfreemem(void) {
   struct run* r;
-  int cnt = 0;
+  uint64 cnt = 0;
 
   acquire(&kmem.lock);
   r = kmem.freelist;
