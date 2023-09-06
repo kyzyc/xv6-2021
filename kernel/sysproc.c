@@ -81,6 +81,37 @@ int
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 start_va, u_buffer;
+  int npages;
+
+  if(argaddr(0, &start_va) < 0)
+    return -1;
+
+  if(argint(1, &npages) < 0)
+    return -1;
+
+  if(argaddr(2, &u_buffer) < 0)
+    return -1;
+    
+  if(npages > 32) 
+    return -1;
+
+  unsigned int ret = 0;
+  pte_t* pte;
+
+  for(int i = 0; i < npages; i++) {
+    if((pte = walk(myproc()->pagetable, start_va + i * PGSIZE, 0)) == 0)
+      return -1;
+
+    if((*pte & PTE_A)) 
+      ret |= (1 << i);
+
+    *pte &= (~(PTE_A));
+  }
+
+  if(copyout(myproc()->pagetable, u_buffer, (char *)&ret, 4) == -1)
+    return -1;
+  
   return 0;
 }
 #endif
