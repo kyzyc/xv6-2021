@@ -49,7 +49,16 @@ copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   char *s = (char *) srcva;
   
   stats.ncopyinstr++;   // XXX lock
+  // if(srcva == 0xf000) {
+  //   vmprint(myproc()->pagetable);
+  //   vmprint(myproc()->k_pagetable);
+  // // }
+  // printf("p->sz: %d\n", p->sz);
+  // printf("p->name: %s\n", p->name);
+  // printf("srcva: %p\n", srcva);
+  // printf("max: %d\n", max);
   for(int i = 0; i < max && srcva + i < p->sz; i++){
+    // printf("%d %d\n", srcva + i, i);
     dst[i] = s[i];
     if(s[i] == '\0')
       return 0;

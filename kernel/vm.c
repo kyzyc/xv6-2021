@@ -348,9 +348,17 @@ uvmcopy_sbrk_grow(pagetable_t old, pagetable_t new, uint64 oldsz, uint64 newsz)
 
   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += PGSIZE){
-    if(mappages(new, a, PGSIZE, walkaddr(old, a), (PTE_FLAGS(*walk(old, a, 0))) & (~(PTE_U))) != 0){
-      uvmdealloc(new, a, oldsz);
-      return 0;
+    uint64 pa = walkaddr(old, a);
+    if (pa != 0) {
+      if(mappages(new, a, PGSIZE, walkaddr(old, a), (PTE_FLAGS(*walk(old, a, 0))) & (~(PTE_U))) != 0){
+        uvmdealloc(new, a, oldsz);
+        return 0;
+      }
+    }
+    else {
+      pte_t *pte = walk(old, a, 0);
+      pte_t *pte_k = walk(new, a, 1);
+      *pte_k = (*pte & (~(PTE_U)));
     }
   }
   return newsz;
@@ -361,7 +369,7 @@ uvmcopy_k(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
   uint64 i;
-  uint flags;
+  int flags;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -371,8 +379,16 @@ uvmcopy_k(pagetable_t old, pagetable_t new, uint64 sz)
 
     flags = PTE_FLAGS(*pte);
 
-    if(mappages(new, i, PGSIZE, walkaddr(old, i), flags&(~(PTE_U))) != 0){
-      goto err;
+    uint64 pa = walkaddr(old, i);
+    if(pa != 0) {
+      if(mappages(new, i, PGSIZE, walkaddr(old, i), flags&(~(PTE_U))) != 0){
+        goto err;
+      }
+    }
+    else {
+      pte_t *pte_k = walk(new, i, 1);
+      *pte_k = *pte;
+      *pte_k &= (~(PTE_U));
     }
   }
   return 0;
@@ -479,8 +495,8 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   //   srcva = va0 + PGSIZE;
   // }
   // return 0;
-  if(walkaddr(pagetable, PGROUNDDOWN(srcva)) == 0) 
-    return -1;
+  // if(walkaddr(pagetable, PGROUNDDOWN(srcva)) == 0) 
+  //   return -1;
   return copyin_new(pagetable, dst, srcva, len);
 }
 
@@ -528,8 +544,8 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   // if(srcva == 0xf000) {
   //   vmprint(pagetable);
   // }
-  if(walkaddr(pagetable, PGROUNDDOWN(srcva)) == 0) 
-    return -1;
+  // if(walkaddr(pagetable, PGROUNDDOWN(srcva)) == 0) 
+  //   return -1;
   return copyinstr_new(pagetable, dst, srcva, max);
 }
 
