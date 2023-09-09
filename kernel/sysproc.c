@@ -49,6 +49,13 @@ sys_sbrk(void)
   addr = myproc()->sz;
   if(growproc(n) < 0)
     return -1;
+
+  if(n > 0)
+    uvmcopy_sbrk_grow(myproc()->pagetable, myproc()->k_pagetable, addr, myproc()->sz);
+  else {
+    freekpagetable(myproc()->k_pagetable);
+    uvmcopy_k(myproc()->pagetable, myproc()->k_pagetable, myproc()->sz);
+  }
   return addr;
 }
 

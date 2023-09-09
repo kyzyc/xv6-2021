@@ -25,6 +25,7 @@ int
 fetchstr(uint64 addr, char *buf, int max)
 {
   struct proc *p = myproc();
+
   int err = copyinstr(p->pagetable, buf, addr, max);
   if(err < 0)
     return err;
@@ -68,6 +69,10 @@ int
 argaddr(int n, uint64 *ip)
 {
   *ip = argraw(n);
+  // vmprint(myproc()->k_pagetable);
+  // if(walkaddr(myproc()->pagetable, *ip) == 0) {
+  //   return -1;
+  // }
   return 0;
 }
 
