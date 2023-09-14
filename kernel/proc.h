@@ -96,6 +96,38 @@ struct proc {
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
 
+  int ticks;
+  int ticks_all;
+  uint64 handler;
+
+  uint64 trap_pc;
+
+  uint64 trap_a0;
+  uint64 trap_a1;
+  uint64 trap_a2;
+  uint64 trap_a3;  
+  uint64 trap_a4; 
+  uint64 trap_a5;
+  uint64 trap_a6;
+  uint64 trap_a7;
+
+  uint64 trap_ra;
+
+  uint64 trap_t0;
+  uint64 trap_t1;
+  uint64 trap_t2;
+  uint64 trap_t3;
+  uint64 trap_t4;
+  uint64 trap_t5;
+  uint64 trap_t6;
+
+  uint64 trap_sp;
+
+  uint64 trap_s0;
+  uint64 trap_s1;
+
+  int is_on_trap;
+
   // these are private to the process, so p->lock need not be held.
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)

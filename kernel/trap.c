@@ -52,6 +52,7 @@ usertrap(void)
   
   if(r_scause() == 8){
     // system call
+    // printf("%p %s\n", p->trapframe->epc);
 
     if(p->killed)
       exit(-1);
@@ -77,8 +78,41 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2) {
+    if(p->ticks != 0) {
+      p->ticks_all++;
+      if(p->ticks_all >= p->ticks && !p->is_on_trap) {
+        p->is_on_trap = 1;
+        //printf("%p %p\n", p->trapframe->epc, p->handler);
+        p->trap_pc = p->trapframe->epc;
+        p->trap_a0 = p->trapframe->a0;
+        p->trap_a1 = p->trapframe->a1;
+        p->trap_a2 = p->trapframe->a2;
+        p->trap_a3 = p->trapframe->a3;
+        p->trap_a4 = p->trapframe->a4;
+        p->trap_a5 = p->trapframe->a5;
+        p->trap_a6 = p->trapframe->a6;
+        p->trap_a7 = p->trapframe->a7;
+        p->trap_ra = p->trapframe->ra;
+        p->trap_sp = p->trapframe->sp;
+        p->trap_t0 = p->trapframe->t0;
+        p->trap_t1 = p->trapframe->t1;
+        p->trap_t2 = p->trapframe->t2;
+        p->trap_t3 = p->trapframe->t3;
+        p->trap_t4 = p->trapframe->t4;
+        p->trap_t5 = p->trapframe->t5;
+        p->trap_t6 = p->trapframe->t6;
+
+        p->trap_s0 = p->trapframe->s0;
+        p->trap_s1 = p->trapframe->s1;
+
+        p->trapframe->epc = p->handler;
+        p->ticks_all = 0;
+      }
+    }
     yield();
+  }
+    
 
   usertrapret();
 }
