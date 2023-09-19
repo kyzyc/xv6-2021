@@ -122,7 +122,6 @@ uint64 sys_sigalarm(void)
 uint64 sys_sigreturn(void)
 {
   struct proc* p = myproc();
-  // printf("%p\n", p->trap_pc);
   p->trapframe->epc = p->trap_pc;
 
   p->trapframe->a0 = p->trap_a0;
@@ -147,7 +146,6 @@ uint64 sys_sigreturn(void)
 
   p->trapframe->s0 = p->trap_s0;
   p->trapframe->s1 = p->trap_s1;
-  //printf("%p\n", p->trap_pc);
   p->is_on_trap = 0;
   return 0;
 }
