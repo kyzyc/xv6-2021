@@ -76,6 +76,7 @@ runcmd(struct cmd *cmd)
     if(ecmd->argv[0] == 0)
       exit(1);
     exec(ecmd->argv[0], ecmd->argv);
+    
     fprintf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
 
@@ -155,8 +156,11 @@ main(void)
     }
   }
 
+  
+
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
+    
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n
@@ -164,8 +168,10 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
+    
     if(fork1() == 0)
       runcmd(parsecmd(buf));
+    // 
     wait(0);
   }
   exit(0);
@@ -197,8 +203,12 @@ execcmd(void)
 {
   struct execcmd *cmd;
 
+  
+
   cmd = malloc(sizeof(*cmd));
+  
   memset(cmd, 0, sizeof(*cmd));
+  
   cmd->type = EXEC;
   return (struct cmd*)cmd;
 }
@@ -423,7 +433,10 @@ parseexec(char **ps, char *es)
   if(peek(ps, es, "("))
     return parseblock(ps, es);
 
+  
+
   ret = execcmd();
+  
   cmd = (struct execcmd*)ret;
 
   argc = 0;

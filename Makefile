@@ -7,6 +7,10 @@
 
 K=kernel
 U=user
+ifndef ver
+ver := release
+endif
+
 
 OBJS = \
   $K/entry.o \
@@ -85,6 +89,10 @@ OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
 CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb
+
+ifeq ($(ver),debug)
+XCFLAGS += -DLAZY_TEST
+endif
 
 ifdef LAB
 LABUPPER = $(shell echo $(LAB) | tr a-z A-Z)

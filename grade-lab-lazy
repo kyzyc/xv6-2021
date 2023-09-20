@@ -19,6 +19,10 @@ def test_filetest():
 def test_memtest():
     r.match("test lazy alloc: OK$")
 
+@test(20, "lazy: out of memory", parent=test_lazytests)
+def test_memtest():
+    r.match("test out of memory: OK$")    
+
 @test(0, "usertests")
 def test_usertests():
     r.run_qemu(shell_script([

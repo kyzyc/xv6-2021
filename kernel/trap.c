@@ -29,6 +29,46 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
+int handle_pagefault(uint64 stval) 
+{
+  struct proc *p = myproc();
+  // invalid virtual address
+  if(stval >= p->sz) {
+    // printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    // printf("            sepc=%p stval=%p\n", r_sepc(), stval);
+    return -1;
+  }
+  else {
+    // guard page
+    pte_t* pte = walk(p->pagetable, stval, 0);
+    if((pte) && (*pte & PTE_V) && !(*pte & PTE_U)) {
+      // printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      // printf("            sepc=%p stval=%p\n", r_sepc(), stval);
+      return -1;
+    }
+
+    char* mem;
+    uint64 a = PGROUNDDOWN(stval);
+    
+    mem = kalloc();
+    if(mem == 0) {
+      return -1;
+    }
+    else {
+      memset(mem, 0, PGSIZE);
+      if(mappages(p->pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0) {
+        kfree(mem);
+        panic("mappages in trap!\n");
+      }
+    }
+  }  
+  // if(stval != r_stval()) {
+  //   printf("%p\n", stval);
+  //   vmprint(p->pagetable);
+  // }
+  return 0;
+}
+
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -68,9 +108,16 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+    if(r_scause() == 13 || r_scause() == 15) {
+      int ret = handle_pagefault(r_stval());
+      if(ret != 0)
+        p->killed = 1;
+    }
+    else {
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
   }
 
   if(p->killed)
