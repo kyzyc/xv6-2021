@@ -286,6 +286,7 @@ freewalk(pagetable_t pagetable)
 void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
+  vmprint(pagetable);
   if(sz > 0)
     uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
   freewalk(pagetable);
@@ -441,9 +442,9 @@ void vmprint_recur(pagetable_t pagetable, int deep)
       // this PTE points to a lower-level page table.
       uint64 child = PTE2PA(pte);
       if(deep == 1) {
-        printf("..");
+        printf(".. ");
       }
-      printf(" ..%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+      printf("..%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
       vmprint_recur((pagetable_t)child, deep + 1);
     } else if(pte & PTE_V){
       printf(".. ..");
