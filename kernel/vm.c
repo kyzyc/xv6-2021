@@ -15,6 +15,8 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+extern int refcount[];    // kalloc.c
+
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -174,8 +176,9 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
+    if((*pte & PTE_V) == 0) {
       panic("uvmunmap: not mapped");
+    }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -266,6 +269,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
 void
 freewalk(pagetable_t pagetable)
 {
+  //vmprint(pagetable);
   // there are 2^9 = 512 PTEs in a page table.
   for(int i = 0; i < 512; i++){
     pte_t pte = pagetable[i];
@@ -275,6 +279,9 @@ freewalk(pagetable_t pagetable)
       freewalk((pagetable_t)child);
       pagetable[i] = 0;
     } else if(pte & PTE_V){
+      if(pte & PTE_C) {
+        continue;
+      }
       panic("freewalk: leaf");
     }
   }
@@ -286,6 +293,7 @@ freewalk(pagetable_t pagetable)
 void
 uvmfree(pagetable_t pagetable, uint64 sz)
 {
+  vmprint(pagetable);
   if(sz > 0)
     uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 1);
   freewalk(pagetable);
@@ -301,31 +309,25 @@ int
 uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
-  uint64 pa, i;
-  uint flags;
-  char *mem;
+  pte_t *pte_p;
+  uint64 i;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
-    pa = PTE2PA(*pte);
-    flags = PTE_FLAGS(*pte) & (~(PTE_W));   // clear write bit for child process
-    *pte = *pte & (~(PTE_W));               // clear write bit for parent process
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
-      goto err;
+    pte_p = walk(new, i, 1);
+    if(!(*pte & PTE_U)) {
+      *pte_p = *pte; 
+    }
+    else {
+      *pte = (*pte & (~(PTE_W))) | (PTE_C);                  // clear write bit for parent process
+      *pte_p = *pte;                                         // just copy the parent pte to the child
+      refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] += 1;
     }
   }
   return 0;
-
- err:
-  uvmunmap(new, 0, i / PGSIZE, 1);
-  return -1;
 }
 
 // mark a PTE invalid for user access.
@@ -347,13 +349,39 @@ uvmclear(pagetable_t pagetable, uint64 va)
 int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
+  // printf("%s\n", p->name)
   uint64 n, va0, pa0;
+  pte_t* pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
+    pte = walk(pagetable, va0, 0);
     if(pa0 == 0)
       return -1;
+
+    // printf("%p\n", *pte);
+
+    if((*pte & PTE_C) && !(*pte & PTE_W)) {
+      // printf("yes!\n");
+      refcount[(pa0 - KERNBASE) / PGSIZE] -= 1;
+
+      char* mem;
+      mem = kalloc();
+      if(mem == 0) {
+        return -1;
+      }
+      memmove(mem, (void *)pa0, PGSIZE);
+      uint64 flags = PTE_FLAGS(*pte) & (~PTE_C);
+      *pte = 0;
+
+      // vmprint(p->pagetable);
+
+      if(mappages(pagetable, va0, PGSIZE, (uint64)mem, flags | PTE_W) != 0) {
+        kfree(mem);
+        return -1;
+      }
+    }
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
@@ -432,4 +460,29 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+void vmprint_recur(pagetable_t pagetable, int deep)
+{
+  for(int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      if(deep == 1) {
+        printf(".. ");
+      }
+      printf("..%d: pte %p pa %p flags %x\n", i, pte, PTE2PA(pte), PTE_FLAGS(pte));
+      vmprint_recur((pagetable_t)child, deep + 1);
+    } else if(pte & PTE_V){
+      printf(".. ..");
+      printf(" ..%d: pte %p pa %p flags %x\n", i, pte, PTE2PA(pte), PTE_FLAGS(pte));
+    }
+  }
+}
+
+void vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable);
+  vmprint_recur(pagetable, 0);
 }

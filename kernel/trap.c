@@ -11,6 +11,8 @@ uint ticks;
 
 extern char trampoline[], uservec[], userret[];
 
+extern int refcount[];
+
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
@@ -68,9 +70,57 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    p->killed = 1;
+    // printf("%s\n", p->name);
+    // vmprint(p->pagetable);
+    if(r_scause() == 13 || r_scause() == 15) {
+      uint64 stval = r_stval();
+      pte_t* pte;
+
+      if((pte = walk(p->pagetable, stval, 0)) == 0) {
+        //printf("here1\n");
+        p->killed = 1;
+        exit(-1);
+      }
+
+      if((*pte & PTE_C) && refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] == 0) {
+        // printf("%p\n", *pte);
+        *pte |= PTE_W;
+      }
+      else {
+        refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] -= 1;
+
+        char* mem;
+        mem = kalloc();
+        if(mem == 0) {
+          //printf("here2\n");
+          p->killed = 1;
+          exit(-1);
+        }
+        memmove(mem, (char *)PTE2PA(*pte), PGSIZE);
+        uint64 flags = PTE_FLAGS(*pte) & (~PTE_C);
+        *pte = 0;
+
+        // vmprint(p->pagetable);
+
+        if(mappages(p->pagetable, PGROUNDDOWN(stval), PGSIZE, (uint64)mem, flags | PTE_W) != 0) {
+          kfree(mem);
+          //printf("here3\n");
+          p->killed = 1;
+          exit(-1);
+        }
+        // printf("ok\n");
+        // vmprint(p->pagetable);
+      }
+    }
+    else {
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
+    // err:
+    //   // printf("here\n");
+    //   p->killed = 1;
+    //   exit(-1);
   }
 
   if(p->killed)
