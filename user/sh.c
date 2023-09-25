@@ -76,6 +76,7 @@ runcmd(struct cmd *cmd)
     ecmd = (struct execcmd*)cmd;
     if(ecmd->argv[0] == 0)
       exit(1);
+    // printf("%s\n", ecmd->argv[0]);
     exec(ecmd->argv[0], ecmd->argv);
     fprintf(2, "exec %s failed\n", ecmd->argv[0]);
     break;
@@ -165,8 +166,10 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
-    if(fork1() == 0)
+    if(fork1() == 0) {
+      //vmprint(myproc()->pagetable);
       runcmd(parsecmd(buf));
+    }
     wait(0);
   }
   exit(0);

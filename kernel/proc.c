@@ -114,6 +114,7 @@ allocproc(void)
       release(&p->lock);
     }
   }
+  // printf("no free proc\n");
   return 0;
 
 found:
@@ -122,6 +123,7 @@ found:
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+    printf("kalloc failed\n");
     freeproc(p);
     release(&p->lock);
     return 0;
@@ -130,6 +132,7 @@ found:
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
+    printf("kalloc failed1\n");
     freeproc(p);
     release(&p->lock);
     return 0;
@@ -150,11 +153,13 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  if(p->trapframe)
+  if(p->trapframe) {
     kfree((void*)p->trapframe);
+  }
   p->trapframe = 0;
-  if(p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
+  if(p->pagetable) {
+    proc_freepagetable(p->pagetable, p->sz); 
+  }
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -175,8 +180,9 @@ proc_pagetable(struct proc *p)
 
   // An empty page table.
   pagetable = uvmcreate();
-  if(pagetable == 0)
+  if(pagetable == 0) {
     return 0;
+  }
 
   // map the trampoline code (for system call return)
   // at the highest user virtual address.
@@ -204,6 +210,7 @@ proc_pagetable(struct proc *p)
 void
 proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
+  // vmprint(pagetable);
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);
@@ -278,6 +285,7 @@ fork(void)
 
   // Allocate process.
   if((np = allocproc()) == 0){
+    // printf("fork failed\n");
     return -1;
   }
 
@@ -302,6 +310,7 @@ fork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+  // printf("pname: %s cname: %s\n", p->name, np->name);
 
   pid = np->pid;
 
@@ -310,6 +319,7 @@ fork(void)
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
+
 
   acquire(&np->lock);
   np->state = RUNNABLE;

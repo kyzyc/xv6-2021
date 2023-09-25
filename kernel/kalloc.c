@@ -14,7 +14,7 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
-int refcount[PHYSTOP / PGSIZE];
+volatile int refcount[(PHYSTOP - KERNBASE) / PGSIZE];
 
 struct run {
   struct run *next;
@@ -26,10 +26,11 @@ struct {
 } kmem;
 
 void
-kinit()
+kinit() 
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  memset((void*)refcount, 0, ((PHYSTOP - KERNBASE) / PGSIZE) * 4);
 }
 
 void
@@ -48,16 +49,20 @@ freerange(void *pa_start, void *pa_end)
 void
 kfree(void *pa)
 {
-  // printf("this\n");
-
   struct run *r;
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // if it is used by many processes, just leave it alone
   if(refcount[((uint64)pa - KERNBASE) / PGSIZE] != 0) {
     refcount[((uint64)pa - KERNBASE) / PGSIZE] -= 1;
+    // if(refcount[((uint64)pa - KERNBASE) / PGSIZE] == 0) {
+    //   printf("freed!\n");
+    // }
+  }
+
+  // if it is used by at least one process, just leave it alone
+  if(refcount[((uint64)pa - KERNBASE) / PGSIZE] != 0) {
     return;
   }
 
@@ -85,6 +90,9 @@ kalloc(void)
   if(r)
     kmem.freelist = r->next;
   release(&kmem.lock);
+
+  if(r)
+    refcount[((uint64)r - KERNBASE) / PGSIZE] = 1;
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk

@@ -2702,7 +2702,6 @@ execout(char *s)
       wait((int*)0);
     }
   }
-
   exit(0);
 }
 
@@ -2833,7 +2832,7 @@ main(int argc, char *argv[])
     {reparent2, "reparent2"},
     {pgbug, "pgbug" },
     {sbrkbugs, "sbrkbugs" },
-    // {badwrite, "badwrite" },
+    {badwrite, "badwrite" },
     {badarg, "badarg" },
     {reparent, "reparent" },
     {twochildren, "twochildren"},
@@ -2920,7 +2919,7 @@ main(int argc, char *argv[])
     }
   }
 
-  if(fail){
+  if(fail) {
     printf("SOME TESTS FAILED\n");
     exit(1);
   } else if((free1 = countfree()) < free0){

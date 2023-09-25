@@ -11,7 +11,7 @@ uint ticks;
 
 extern char trampoline[], uservec[], userret[];
 
-extern int refcount[];
+extern volatile int refcount[];
 
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
@@ -70,21 +70,34 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    // printf("%s\n", p->name);
-    // vmprint(p->pagetable);
     if(r_scause() == 13 || r_scause() == 15) {
       uint64 stval = r_stval();
+      if(stval >= p->sz) {
+        p->killed = 1;
+        exit(-1);
+      }
       pte_t* pte;
+      pte_t tmp;
 
-      if((pte = walk(p->pagetable, stval, 0)) == 0) {
-        //printf("here1\n");
+      if((pte = walk(p->pagetable, PGROUNDDOWN(stval), 0)) == 0) {
         p->killed = 1;
         exit(-1);
       }
 
-      if((*pte & PTE_C) && refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] == 0) {
-        // printf("%p\n", *pte);
+      if(pte == 0 || *pte == 0) {
+        p->killed = 1;
+        exit(-1);
+      }
+
+      // guard page
+      if(!(*pte & PTE_U)) {
+        p->killed = 1;
+        exit(-1);
+      }
+
+      if((*pte & PTE_C) && refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] == 1) {
         *pte |= PTE_W;
+        *pte &= (~PTE_C);
       }
       else {
         refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] -= 1;
@@ -92,35 +105,30 @@ usertrap(void)
         char* mem;
         mem = kalloc();
         if(mem == 0) {
-          //printf("here2\n");
+          refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] += 1;
           p->killed = 1;
           exit(-1);
         }
         memmove(mem, (char *)PTE2PA(*pte), PGSIZE);
+
         uint64 flags = PTE_FLAGS(*pte) & (~PTE_C);
+
+        tmp = *pte;
         *pte = 0;
-
-        // vmprint(p->pagetable);
-
         if(mappages(p->pagetable, PGROUNDDOWN(stval), PGSIZE, (uint64)mem, flags | PTE_W) != 0) {
+          refcount[(PTE2PA(*pte) - KERNBASE) / PGSIZE] += 1;
+          *pte = tmp;
           kfree(mem);
-          //printf("here3\n");
           p->killed = 1;
           exit(-1);
         }
-        // printf("ok\n");
-        // vmprint(p->pagetable);
       }
     }
     else {
-      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("usertrap(): unexpected scause %p pid=%d pname=%s\n", r_scause(), p->pid, p->name);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       p->killed = 1;
     }
-    // err:
-    //   // printf("here\n");
-    //   p->killed = 1;
-    //   exit(-1);
   }
 
   if(p->killed)
