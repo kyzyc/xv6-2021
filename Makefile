@@ -190,9 +190,6 @@ UPROGS=\
 	$U/_zombie\
 	$U/_spin\
 
-
-
-
 ifeq ($(LAB),$(filter $(LAB), lock))
 UPROGS += \
 	$U/_stats
