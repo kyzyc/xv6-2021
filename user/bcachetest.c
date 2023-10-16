@@ -127,7 +127,7 @@ test0()
       exit(0);
     }
   }
-
+  
   for(int i = 0; i < NCHILD; i++){
     wait(0);
   }
