@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "buf.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -286,6 +287,34 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+static struct inode*
+recur_find(struct inode **ip, int deep)
+{
+  char buf[MAXPATH];
+
+  if (deep >= 10) {
+    return 0;
+  }
+
+  struct buf* bp = bread((*ip)->dev, bmap(*ip, 0));
+  iunlockput(*ip);
+  memmove(buf, bp->data, strlen((const char *)bp->data) + 1);
+  brelse(bp);
+  if((*ip = namei(buf)) == 0){
+    return 0;
+  }
+
+  ilock(*ip);
+
+  if ((*ip)->type == T_SYMLINK) {
+    return recur_find(ip, deep + 1);
+  } else if ((*ip)->type == T_FILE){
+    return *ip;
+  } else {
+    return 0;
+  }
+}
+
 uint64
 sys_open(void)
 {
@@ -319,12 +348,24 @@ sys_open(void)
     }
   }
 
+
+  // deal with symbolic link with FOLLOW enabled
+  if(ip->type == T_SYMLINK && (!(omode & O_NOFOLLOW))) {
+    // printf("bbbb: %d\n", ip->inum);
+    struct inode *newip; 
+    if ((newip = recur_find(&ip, 0)) == 0) {
+      end_op();
+      return -1;
+    } else {
+      ip = newip;
+    }
+  }
+
   if(ip->type == T_DEVICE && (ip->major < 0 || ip->major >= NDEV)){
     iunlockput(ip);
     end_op();
     return -1;
   }
-
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
@@ -347,11 +388,9 @@ sys_open(void)
   if((omode & O_TRUNC) && ip->type == T_FILE){
     itrunc(ip);
   }
-  // printf("-----------------------\n");
 
   iunlock(ip);
   end_op();
-
   return fd;
 }
 
@@ -488,3 +527,50 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_symlink(void)
+{
+  char target[MAXPATH], path[MAXPATH];
+  char name[DIRSIZ];
+  struct inode *dp, *ip;
+  struct buf* bp;
+
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0){
+    return -1;
+  }
+
+  begin_op();
+  if((dp = nameiparent(path, name)) == 0)
+    goto bad;
+  ilock(dp);
+  if((ip = ialloc(dp->dev, T_SYMLINK)) == 0)
+    panic("create: ialloc");
+  ilock(ip);
+  ip->nlink = 1;
+  uint blkno = bmap(ip, 0);
+  bp = bread(ip->dev, blkno);
+  memmove(bp->data, target, strlen(target) + 1);
+  // printf("%d %s %d %s\n", ip->inum, bp->data, ip->type, name);
+  log_write(bp);
+  brelse(bp);
+  iupdate(ip);
+  // iunlock(ip);
+
+  if(dirlink(dp, name, ip->inum) < 0){
+    ip->nlink = 0;
+    iunlockput(ip);
+    iunlockput(dp);
+    goto bad;
+  }
+  iunlockput(ip);
+  iunlockput(dp);
+
+  end_op();
+  return 0;
+bad:
+  end_op();
+  return -1;
+}
+
+

@@ -470,7 +470,7 @@ exitiputtest(char *s)
 // directory call iput() in a transaction?
 // needs a hacked kernel that pauses just after the namei()
 // call in sys_open():
-//    if((ip = namei(path)) == 0)
+//    if((ip = bigpath)) == 0)
 //      return -1;
 //    {
 //      int i;
