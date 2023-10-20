@@ -275,9 +275,12 @@ create(char *path, short type, short major, short minor)
       panic("create dots");
   }
 
+  // printf("-----------------------\n");
+
   if(dirlink(dp, name, ip->inum) < 0)
     panic("create: dirlink");
 
+  // printf("-----------------------\n");
   iunlockput(dp);
 
   return ip;
@@ -322,6 +325,7 @@ sys_open(void)
     return -1;
   }
 
+
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
@@ -340,10 +344,10 @@ sys_open(void)
   f->ip = ip;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
-
   if((omode & O_TRUNC) && ip->type == T_FILE){
     itrunc(ip);
   }
+  // printf("-----------------------\n");
 
   iunlock(ip);
   end_op();
@@ -458,7 +462,7 @@ uint64
 sys_pipe(void)
 {
   uint64 fdarray; // user pointer to array of two integers
-  struct file *rf, *wf;
+  struct file *rf, *wf; 
   int fd0, fd1;
   struct proc *p = myproc();
 

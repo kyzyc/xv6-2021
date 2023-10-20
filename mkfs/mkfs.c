@@ -92,6 +92,7 @@ main(int argc, char *argv[])
   // 1 fs block = 1 disk sector
   nmeta = 2 + nlog + ninodeblocks + nbitmap;
   nblocks = FSSIZE - nmeta;
+  // printf("%d nemeta: %d nblocks: %d\n", FSSIZE - nmeta, nmeta, nblocks);
 
   sb.magic = FSMAGIC;
   sb.size = xint(FSSIZE);

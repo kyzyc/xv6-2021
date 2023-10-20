@@ -68,6 +68,7 @@ balloc(uint dev)
   struct buf *bp;
 
   bp = 0;
+  // printf("sb.size: %d\n", sb.size);
   for(b = 0; b < sb.size; b += BPB){
     bp = bread(dev, BBLOCK(b, sb));
     for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
@@ -400,6 +401,31 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
+  bn -= NINDIRECT;
+
+  if (bn < NININDIRECT) {
+    if((addr = ip->addrs[NDIRECT + 1]) == 0) {
+      ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
+    }
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    int nth = bn / NINDIRECT;
+    if((addr = a[nth]) == 0) {
+      a[nth] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    nth = bn % NINDIRECT;
+    if((addr = a[nth]) == 0){
+      a[nth] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    // brelse(bp1);
+    return addr;
+  }
 
   panic("bmap: out of range");
 }
@@ -409,9 +435,9 @@ bmap(struct inode *ip, uint bn)
 void
 itrunc(struct inode *ip)
 {
-  int i, j;
-  struct buf *bp;
-  uint *a;
+  int i, j, z;
+  struct buf *bp, *bp1;
+  uint *a, *a1;
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
@@ -430,6 +456,24 @@ itrunc(struct inode *ip)
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+
+  if(ip->addrs[NDIRECT + 1]){
+    bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
+    a = (uint*)bp->data;
+    for(j = 0; j < NINDIRECT; j++){
+      bp1 = bread(ip->dev, a[j]);
+      a1 = (uint*)bp1->data;
+      for(z = 0; z < NINDIRECT; z++) {
+        if(a1[z]) 
+          bfree(ip->dev, a1[z]);
+      }
+      brelse(bp1);
+      bfree(ip->dev, a[j]);
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+    ip->addrs[NDIRECT + 1] = 0;
   }
 
   ip->size = 0;
@@ -489,10 +533,12 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
   uint tot, m;
   struct buf *bp;
 
-  if(off > ip->size || off + n < off)
+  if(off > ip->size || off + n < off) {
     return -1;
-  if(off + n > MAXFILE*BSIZE)
+  }
+  if(off + n > MAXFILE*BSIZE) {
     return -1;
+  }
 
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
@@ -615,7 +661,7 @@ skipelem(char *path, char *name)
   else {
     memmove(name, s, len);
     name[len] = 0;
-  }
+  } 
   while(*path == '/')
     path++;
   return path;
