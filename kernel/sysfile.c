@@ -519,7 +519,7 @@ sys_mmap(void)
     if (checkVMAAddr(addr, len)) {
       break;
     } else {
-      printf("should!\n");
+      // printf("should!\n");
       addr = PGROUNDUP(p->VMA[i].addr + p->VMA[i].len);
     }
   }

@@ -154,6 +154,10 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
+  if(p->vmaIndex != 0) {
+    // printf("called!\n");
+    proc_freeVMApagetable(p->pagetable, p);
+  }
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
@@ -198,6 +202,16 @@ proc_pagetable(struct proc *p)
   }
 
   return pagetable;
+}
+
+void
+proc_freeVMApagetable(pagetable_t pagetable, struct proc* p)
+{
+  for (int i = 0; i < p->vmaIndex; ++i) {
+    int freePages = PGROUNDUP(p->VMA[i].len) / PGSIZE;
+    // printf("freepages: %d\n");
+    uvmunmap(pagetable, PGROUNDDOWN(p->VMA[i].addr), freePages, 1);
+  }
 }
 
 // Free a process's page table, and free the
