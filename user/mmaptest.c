@@ -9,6 +9,7 @@
 void mmap_test();
 void fork_test();
 char buf[BSIZE];
+char buf1[BSIZE];
 
 #define MAP_FAILED ((char *) -1)
 
@@ -67,9 +68,15 @@ makefile(const char *f)
   if (fd == -1)
     err("open");
   memset(buf, 'A', BSIZE);
+  memset(buf1, '\0', BSIZE);
   // write 1.5 page
   for (i = 0; i < n + n/2; i++) {
     if (write(fd, buf, BSIZE) != BSIZE)
+      err("write A makefile");
+  }
+  
+  for (i = 0; i < n/2; i++) {
+    if (write(fd, buf1, BSIZE) != BSIZE)
       err("write 0 makefile");
   }
   if (close(fd) == -1)
@@ -130,6 +137,7 @@ mmap_test(void)
   _v1(p);
   for (i = 0; i < PGSIZE*2; i++)
     p[i] = 'Z';
+  printf("test mmap private: OK\n");
   if (munmap(p, PGSIZE*2) == -1)
     err("munmap (2)");
 

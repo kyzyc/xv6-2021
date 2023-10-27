@@ -3,8 +3,12 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -15,6 +19,7 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
+
 
 void
 trapinit(void)
@@ -27,6 +32,24 @@ void
 trapinithart(void)
 {
   w_stvec((uint64)kernelvec);
+}
+
+// check if page fault address is in vma aeras
+static int
+checkVMAAddr(uint64 addr) {
+  struct proc* p = myproc();
+
+  struct vma v;
+  int i;
+  for (i = 0; i < p->vmaIndex; ++i) {
+    v = p->VMA[i];
+    // printf("VMA[%d]: addr[%p] len[%d]\n", i, v.addr, v.len);
+    if (addr >= v.addr && addr < (v.addr + v.len)) {
+      return i;
+    }
+  }
+
+  return -1;
 }
 
 //
@@ -67,6 +90,53 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if(r_scause() == 13 || r_scause() == 15) {
+    // load or store page fault
+    uint64 addr = r_stval();      // page fault address
+    // printf("addr: %p\n", addr);
+    // only consider mmap situation
+    int vmaindex;
+    if ((vmaindex = checkVMAAddr(addr)) != -1) {
+      // read 4096 bytes of the relevant file into that page, 
+      // and map it into the user address space
+      char* mem;
+      if ((mem = kalloc()) == 0) {
+        panic("kalloc!");
+      }
+
+      // printf("off: %d\n", addr - p->VMA[vmaindex].addr);
+      struct inode* ip = p->VMA[vmaindex].file->ip;
+      ilock(ip);
+      if (readi(ip, 0, (uint64)mem, addr - p->VMA[vmaindex].addr, PGSIZE) < 0) {
+        iunlock(ip);
+        panic("read file to vma virtual space!");
+      } 
+      iunlock(ip); 
+
+      // for (int i = 0; i < PGSIZE; ++i) {
+      //   printf("%d ", mem[i]);
+      // }
+      // printf("\n");
+      int flags = PTE_V|PTE_U;
+      if (p->VMA[vmaindex].prot & PROT_READ) {
+        flags = flags|PTE_R;
+      }
+      if (p->VMA[vmaindex].prot & PROT_WRITE) {
+        flags = flags|PTE_W;
+      }
+      if (p->VMA[vmaindex].prot & PROT_EXEC) {
+        flags = flags|PTE_X;
+      }
+
+      if (mappages(p->pagetable, PGROUNDDOWN(addr), PGSIZE, (uint64)mem, flags) < 0) {
+        panic("mappages!");
+      }
+    } else {
+      // printf("error!\n");
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      p->killed = 1;
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
