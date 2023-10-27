@@ -485,14 +485,79 @@ sys_pipe(void)
   return 0;
 }
 
+static int checkVMAAddr(uint64 addr, uint64 len);
 uint64
 sys_mmap(void)
 {
-  return -1;
+  uint64 addr;
+  uint64 len, off; 
+  int prot, flags;
+  struct file* file;
+
+  if (argaddr(0, &addr) < 0) {
+    return -1;
+  }
+
+  if (argint(1, (int*)&len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0) {
+    return -1;
+  }
+
+  if (argfd(5, 0, &file) < 0 || argint(5, (int*)&off) < 0) {
+    return -1;
+  }
+
+  // only consider address is zero
+  if (addr != 0) {
+    return -1;
+  }
+
+  struct proc* p = myproc();
+
+  addr = VMASTART;
+
+  for (int i = 0; i < p->vmaIndex; ++i) {
+    if (checkVMAAddr(addr, len)) {
+      break;
+    } else {
+      addr = PGROUNDUP(p->VMA[i].addr + p->VMA[i].len);
+    }
+  }
+
+  // add vma to process VMA array
+  if (p->vmaIndex < NOVMA) {
+    p->VMA[p->vmaIndex].addr = addr;
+    p->VMA[p->vmaIndex].len = len;
+    p->VMA[p->vmaIndex].off = off;
+    p->VMA[p->vmaIndex].prot = prot;
+    p->VMA[p->vmaIndex].flags = flags;
+    p->VMA[p->vmaIndex].file = file;
+    filedup(file);                // increase the file's reference count
+    p->vmaIndex++;
+  } else {
+    return -1;
+  }
+  
+  return 0;
 }
 
 uint64
 sys_munmap(void)
 {
   return -1;
+}
+
+static int
+checkVMAAddr(uint64 addr, uint64 len)
+{
+  struct proc* p = myproc();
+  for (int i = 0; i < p->vmaIndex; ++i) {
+    struct vma VMA = p->VMA[i];
+    if (addr > VMA.addr && addr < PGROUNDUP(VMA.addr + VMA.len)) {
+      return 0;
+    }
+    if ((addr + len) > VMA.addr && (addr + len) < PGROUNDUP(VMA.addr + VMA.len)) {
+      return 0;
+    }
+  }
+  return 1;
 }
