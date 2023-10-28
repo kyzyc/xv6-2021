@@ -28,8 +28,8 @@ struct cpu {
 
 struct vma {
   uint64 addr;    // vma
-  uint64 len;   
   uint64 off;
+  int len;   
   int prot;
   int flags;
   struct file* file;

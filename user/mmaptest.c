@@ -137,7 +137,6 @@ mmap_test(void)
   _v1(p);
   for (i = 0; i < PGSIZE*2; i++)
     p[i] = 'Z';
-  printf("test mmap private: OK\n");
   if (munmap(p, PGSIZE*2) == -1)
     err("munmap (2)");
 

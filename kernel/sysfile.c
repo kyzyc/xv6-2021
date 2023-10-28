@@ -490,15 +490,15 @@ uint64
 sys_mmap(void)
 {
   uint64 addr;
-  uint64 len, off; 
-  int prot, flags;
+  uint64 off; 
+  int prot, flags, len;
   struct file* file;
 
   if (argaddr(0, &addr) < 0) {
     return -1;
   }
 
-  if (argint(1, (int*)&len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0) {
+  if (argint(1, &len) < 0 || argint(2, &prot) < 0 || argint(3, &flags) < 0) {
     return -1;
   }
 
@@ -531,12 +531,11 @@ sys_mmap(void)
     if (checkVMAAddr(addr, len)) {
       break;
     } else {
-      // printf("should!\n");
-      addr = PGROUNDUP(p->VMA[i].addr + p->VMA[i].len);
+      addr = p->VMA[i].addr + p->VMA[i].len;
+      addr = PGROUNDUP(addr);
     }
   }
   // add vma to process VMA array
-  // printf("prot: %d\n", prot); 
   if (p->vmaIndex < NOVMA) {
     p->VMA[p->vmaIndex].addr = addr;
     p->VMA[p->vmaIndex].len = len;
@@ -562,11 +561,9 @@ findVMAIndex(uint64 addr, uint64 len, int* Index)
   for (int i = 0; i < p->vmaIndex; ++i) {
     VMA = &p->VMA[i];
     if ((addr >= VMA->addr) && ((addr + len) <= (VMA->addr + VMA->len))) {
-      // printf("yes!\n");
       *Index = i;
       return 1;
     }
-    // printf("%p %p %p %p\n", addr, VMA.addr, addr + len, VMA.addr + VMA.len);
   }
 
   return 0;
@@ -634,8 +631,6 @@ sys_munmap(void)
       return 0;
     }
   } else {
-    printf("error!\n");
-    printf("%p %d\n", addr, len);
     return -1;
   }
 }
@@ -647,6 +642,8 @@ checkVMAAddr(uint64 addr, uint64 len)
   struct vma* VMA;
   for (int i = 0; i < p->vmaIndex; ++i) {
     VMA = &p->VMA[i];
+    uint64 finalAddr = VMA->addr + VMA->len;
+    finalAddr = PGROUNDUP(finalAddr);
     if (addr >= VMA->addr && addr < PGROUNDUP(VMA->addr + VMA->len)) {
       return 0;
     }

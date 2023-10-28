@@ -155,7 +155,6 @@ freeproc(struct proc *p)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
   if(p->vmaIndex != 0) {
-    // printf("called!\n");
     proc_freeVMApagetable(p->pagetable, p);
   }
   if(p->pagetable)
@@ -209,9 +208,8 @@ proc_freeVMApagetable(pagetable_t pagetable, struct proc* p)
 {
   for (int i = 0; i < p->vmaIndex; ++i) {
     int freePages = PGROUNDUP(p->VMA[i].len) / PGSIZE;
-    // printf("freepages: %d\n");
-    for (int i = 0; i < freePages; ++i) {
-      uvmunmap(pagetable, PGROUNDDOWN(p->VMA[i].addr + PGSIZE * i), 1, 1);
+    for (int j = 0; j < freePages; ++j) {
+      uvmunmap(pagetable, PGROUNDDOWN(p->VMA[i].addr + PGSIZE * j), 1, 1);
     }
   }
 }
@@ -321,6 +319,19 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+
+
+  // copy VMA
+  np->vmaIndex = p->vmaIndex;
+  for (int i = 0; i < p->vmaIndex; ++i) {
+    np->VMA[i].addr = p->VMA[i].addr;
+    np->VMA[i].len = p->VMA[i].len;
+    np->VMA[i].off = p->VMA[i].off;
+    np->VMA[i].flags = p->VMA[i].flags;
+    np->VMA[i].file = p->VMA[i].file;
+    np->VMA[i].prot = p->VMA[i].prot;
+    filedup(np->VMA[i].file);
+  }
 
   release(&np->lock);
 
