@@ -210,7 +210,9 @@ proc_freeVMApagetable(pagetable_t pagetable, struct proc* p)
   for (int i = 0; i < p->vmaIndex; ++i) {
     int freePages = PGROUNDUP(p->VMA[i].len) / PGSIZE;
     // printf("freepages: %d\n");
-    uvmunmap(pagetable, PGROUNDDOWN(p->VMA[i].addr), freePages, 1);
+    for (int i = 0; i < freePages; ++i) {
+      uvmunmap(pagetable, PGROUNDDOWN(p->VMA[i].addr + PGSIZE * i), 1, 1);
+    }
   }
 }
 

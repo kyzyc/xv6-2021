@@ -39,12 +39,12 @@ static int
 checkVMAAddr(uint64 addr) {
   struct proc* p = myproc();
 
-  struct vma v;
+  struct vma* v;
   int i;
   for (i = 0; i < p->vmaIndex; ++i) {
-    v = p->VMA[i];
+    v = &p->VMA[i];
     // printf("VMA[%d]: addr[%p] len[%d]\n", i, v.addr, v.len);
-    if (addr >= v.addr && addr < (v.addr + v.len)) {
+    if (addr >= v->addr && addr < (v->addr + v->len)) {
       return i;
     }
   }

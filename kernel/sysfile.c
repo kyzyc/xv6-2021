@@ -511,6 +511,18 @@ sys_mmap(void)
     return -1;
   }
 
+  // check file permission
+  if (prot & PROT_READ) {
+    if (!file->readable) {
+      return -1;
+    }
+  }
+  if (prot & PROT_WRITE) {
+    if (!(flags & MAP_PRIVATE) && !file->writable) {
+      return -1;
+    }
+  }
+
   struct proc* p = myproc();
 
   addr = VMASTART;
@@ -541,23 +553,104 @@ sys_mmap(void)
   return addr;
 }
 
+static int
+findVMAIndex(uint64 addr, uint64 len, int* Index) 
+{
+  struct proc* p = myproc();
+
+  struct vma* VMA;
+  for (int i = 0; i < p->vmaIndex; ++i) {
+    VMA = &p->VMA[i];
+    if ((addr >= VMA->addr) && ((addr + len) <= (VMA->addr + VMA->len))) {
+      // printf("yes!\n");
+      *Index = i;
+      return 1;
+    }
+    // printf("%p %p %p %p\n", addr, VMA.addr, addr + len, VMA.addr + VMA.len);
+  }
+
+  return 0;
+}
+
+static void
+moveAllVMA(int Index)
+{
+  struct proc* p = myproc();
+
+  int end = p->vmaIndex;
+  for (int i = Index; i < end - 1; ++i) {
+    p->VMA[i].addr = p->VMA[i + 1].addr;
+    p->VMA[i].len = p->VMA[i + 1].len;
+    p->VMA[i].off = p->VMA[i + 1].off;
+    p->VMA[i].flags = p->VMA[i + 1].flags;
+    p->VMA[i].file = p->VMA[i + 1].file;
+    p->VMA[i].prot = p->VMA[i + 1].prot;
+  }
+}
+
 uint64
 sys_munmap(void)
 {
-  return -1;
+  uint64 addr;
+  int len;
+  if (argaddr(0, &addr) < 0 || argint(1, &len) < 0) {
+    return -1;
+  }
+
+  int vmaIndex;
+  struct proc* p = myproc();
+
+  if (findVMAIndex(addr, len, &vmaIndex)) {
+    // should delete whole vma
+    if (p->VMA[vmaIndex].addr == addr && p->VMA[vmaIndex].len == len) {
+      if (p->VMA[vmaIndex].flags & MAP_SHARED) {
+        // write back to file
+        filewrite(p->VMA[vmaIndex].file, p->VMA[vmaIndex].addr, len);
+      }
+      // unmap the address range 
+      int freePages = PGROUNDUP(p->VMA[vmaIndex].len) / PGSIZE;
+      uvmunmap(p->pagetable, PGROUNDDOWN(p->VMA[vmaIndex].addr), freePages, 1);
+      // decrement the reference count of the corresponding struct file
+      fileclose(p->VMA[vmaIndex].file);
+      // move whole VMA
+      moveAllVMA(vmaIndex);
+      // decrement vmaIndex
+      p->vmaIndex--; 
+      return 0;
+    } else {
+      if (p->VMA[vmaIndex].flags & MAP_SHARED) {
+        // write back to file
+        filewrite(p->VMA[vmaIndex].file, p->VMA[vmaIndex].addr, len);
+      }
+      // only consider start of vma seciton or end of vma section
+      // start of vma section
+      if (p->VMA[vmaIndex].addr == addr) {
+        p->VMA[vmaIndex].addr += len;
+      }
+      p->VMA[vmaIndex].len -= len;
+      // unmap the address range 
+      int freePages = PGROUNDUP(len) / PGSIZE;
+      uvmunmap(p->pagetable, PGROUNDDOWN(addr), freePages, 1);
+      return 0;
+    }
+  } else {
+    printf("error!\n");
+    printf("%p %d\n", addr, len);
+    return -1;
+  }
 }
 
 static int
 checkVMAAddr(uint64 addr, uint64 len)
 {
   struct proc* p = myproc();
-  struct vma VMA;
+  struct vma* VMA;
   for (int i = 0; i < p->vmaIndex; ++i) {
-    VMA = p->VMA[i];
-    if (addr >= VMA.addr && addr < PGROUNDUP(VMA.addr + VMA.len)) {
+    VMA = &p->VMA[i];
+    if (addr >= VMA->addr && addr < PGROUNDUP(VMA->addr + VMA->len)) {
       return 0;
     }
-    if ((addr + len) >= VMA.addr && (addr + len) < PGROUNDUP(VMA.addr + VMA.len)) {
+    if ((addr + len) >= VMA->addr && (addr + len) < PGROUNDUP(VMA->addr + VMA->len)) {
       return 0;
     }
   }
