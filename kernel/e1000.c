@@ -105,7 +105,9 @@ e1000_transmit(struct mbuf *m)
   // printf("hello from transmit end!\n");
 
   // the ring is overflowing
+  acquire(&e1000_lock);
   if (!(tx_ring[regs[E1000_TDT]].status & E1000_TXD_STAT_DD)) {
+    release(&e1000_lock);
     return -1;
   }
   // use mbuffree() to free the last mbuf that was transmitted from that descriptor (if there was one)
@@ -123,6 +125,7 @@ e1000_transmit(struct mbuf *m)
 
   // update the ring position by adding one to E1000_TDT modulo TX_RING_SIZE
   regs[E1000_TDT] = (regs[E1000_TDT] + 1) % TX_RING_SIZE;
+  release(&e1000_lock);
   return 0;
 }
 
@@ -136,6 +139,44 @@ e1000_recv(void)
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
   // printf("hello from receive end!\n");
+
+  // the ring index at which the next waiting received packet (if any) is located
+  acquire(&e1000_lock);
+  uint8 index = regs[E1000_RDT];
+  index = (index + 1) % RX_RING_SIZE;
+  // release(&e1000_lock);
+  while (1) {
+    // acquire(&e1000_lock);
+    // if a new packet is available
+    if (!(rx_ring[index].status & E1000_RXD_STAT_DD)) {
+      // not available
+      break;
+    }
+
+    // update the mbuf's m->len to the length reported in the descriptor
+    rx_mbufs[index]->len = rx_ring[index].length;
+
+    release(&e1000_lock);
+    // Deliver the mbuf to the network stack
+    net_rx(rx_mbufs[index]);
+    acquire(&e1000_lock);
+    // allocate a new mbuf using mbufalloc() to replace the one just given to net_rx()
+    rx_mbufs[index] = mbufalloc(0);
+    if (!rx_mbufs[index])
+      panic("e1000");
+    // Program its data pointer (m->head) into the descriptor
+    rx_ring[index].addr = (uint64) rx_mbufs[index]->head;
+    // Clear the descriptor's status bits to zero.
+    rx_ring[index].status = 0;
+    index = (index + 1) % RX_RING_SIZE;
+    // release(&e1000_lock);
+  }
+
+  // acquire(&e1000_lock);
+  // update the E1000_RDT register to be the index of the last ring descriptor processed.
+  regs[E1000_RDT] = index - 1;
+
+  release(&e1000_lock);
 }
 
 void

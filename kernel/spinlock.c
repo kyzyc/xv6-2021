@@ -62,8 +62,9 @@ void
 acquire(struct spinlock *lk)
 {
   push_off(); // disable interrupts to avoid deadlock.
-  if(holding(lk))
+  if(holding(lk)) {
     panic("acquire");
+  }
 
 #ifdef LAB_LOCK
     __sync_fetch_and_add(&(lk->n), 1);
